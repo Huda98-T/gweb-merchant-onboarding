@@ -51,6 +51,13 @@ class UnauthorizedError(AppError):
     status_code = 401
 
 
+class UpstreamTimeoutError(AppError):
+    """Raised when an outbound call (e.g. S3) times out or the remaining
+    Lambda budget is too low to safely start it — spec §1.3's 504 case."""
+
+    status_code = 504
+
+
 def handle_errors(handler: Callable[..., dict]) -> Callable[..., dict]:
     """Decorator wrapping a Lambda handler with consistent error responses."""
 

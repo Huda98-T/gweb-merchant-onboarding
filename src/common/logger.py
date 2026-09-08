@@ -26,6 +26,10 @@ REDACTED_FIELDS = {
     "first_name",
     "lastName",
     "last_name",
+    "uploadUrl",
+    "upload_url",
+    "presignedUrl",
+    "presigned_url",
 }
 REDACTED_PLACEHOLDER = "***REDACTED***"
 
