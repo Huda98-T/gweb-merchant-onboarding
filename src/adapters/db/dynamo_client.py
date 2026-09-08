@@ -83,6 +83,61 @@ def _serialize(item: dict[str, Any]) -> dict[str, Any]:
     return {k: _serializer.serialize(v) for k, v in item.items()}
 
 
+def _build_set_expression(values: dict[str, Any], *, prefix: str) -> tuple[str, dict, dict]:
+    """Build a `SET ...` clause with placeholder names/values for `values`.
+
+    Every attribute name is aliased (`#{prefix}{i}`), so callers never need
+    to worry about DynamoDB reserved words (e.g. `status`) appearing in
+    `values`' keys.
+    """
+    set_clauses = []
+    expr_names: dict[str, str] = {}
+    expr_values: dict[str, Any] = {}
+    for i, (key, value) in enumerate(values.items()):
+        name_placeholder = f"#{prefix}{i}"
+        value_placeholder = f":{prefix}{i}"
+        expr_names[name_placeholder] = key
+        expr_values[value_placeholder] = value
+        set_clauses.append(f"{name_placeholder} = {value_placeholder}")
+    return "SET " + ", ".join(set_clauses), expr_names, expr_values
+
+
+def update_item(
+    pk: str,
+    sk: str,
+    updates: dict[str, Any],
+    *,
+    condition_expression: str | None = None,
+    condition_names: dict[str, str] | None = None,
+    condition_values: dict[str, Any] | None = None,
+) -> None:
+    """Conditionally UpdateItem a single item — e.g. a DOC# status transition.
+
+    `condition_expression` may reference reserved words via its own
+    `condition_names` placeholders (the `updates` side is always aliased
+    automatically). Raises ConflictError on a failed condition check.
+    """
+    update_expression, expr_names, expr_values = _build_set_expression(updates, prefix="u")
+    expr_names.update(condition_names or {})
+    expr_values.update(condition_values or {})
+
+    kwargs: dict[str, Any] = {
+        "Key": {"PK": pk, "SK": sk},
+        "UpdateExpression": update_expression,
+        "ExpressionAttributeNames": expr_names,
+        "ExpressionAttributeValues": expr_values,
+    }
+    if condition_expression:
+        kwargs["ConditionExpression"] = condition_expression
+
+    try:
+        _table().update_item(**kwargs)
+    except ClientError as exc:
+        if exc.response["Error"]["Code"] == "ConditionalCheckFailedException":
+            raise ConflictError("Item was modified concurrently — reload and retry") from exc
+        raise
+
+
 def put_item_with_meta_version_bump(
     *,
     item: dict[str, Any],
@@ -101,15 +156,10 @@ def put_item_with_meta_version_bump(
     new_version = expected_version + 1
 
     meta_update_values: dict[str, Any] = {**meta_updates, "version": new_version}
-    set_clauses = []
-    expr_names: dict[str, str] = {}
-    expr_values: dict[str, Any] = {":expected_version": expected_version}
-    for i, (key, value) in enumerate(meta_update_values.items()):
-        name_placeholder = f"#f{i}"
-        value_placeholder = f":v{i}"
-        expr_names[name_placeholder] = key
-        expr_values[value_placeholder] = value
-        set_clauses.append(f"{name_placeholder} = {value_placeholder}")
+    update_expression, expr_names, expr_values = _build_set_expression(
+        meta_update_values, prefix="f"
+    )
+    expr_values[":expected_version"] = expected_version
 
     try:
         _raw_client().transact_write_items(
@@ -119,7 +169,7 @@ def put_item_with_meta_version_bump(
                     "Update": {
                         "TableName": table_name,
                         "Key": _serialize({"PK": meta_pk, "SK": "META"}),
-                        "UpdateExpression": "SET " + ", ".join(set_clauses),
+                        "UpdateExpression": update_expression,
                         "ConditionExpression": "version = :expected_version",
                         "ExpressionAttributeNames": expr_names,
                         "ExpressionAttributeValues": {

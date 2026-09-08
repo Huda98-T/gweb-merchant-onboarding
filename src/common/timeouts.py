@@ -1,8 +1,7 @@
 """Timeout-budget helper — see GWEB_Implementation_Spec.md §1.3.
 
-Not exercised by the Phase 1 handlers (none make outbound calls yet), but
-provided now as shared infrastructure for the document/AI-adapter handlers
-that will use it to decide when to fall back to the async PROCESSING path.
+First wired into a handler in Phase 2 (document /complete's S3 HEAD/GET
+calls). Kept generic so a later AI-adapter/evaluate handler can reuse it.
 """
 
 from __future__ import annotations
@@ -11,6 +10,12 @@ from typing import Protocol
 
 SOFT_DEADLINE_MS = 30_000
 OUTBOUND_CALL_BUDGET_FRACTION = 0.6
+
+# Phase 2 (document /complete): with the 45s hard Lambda Timeout, bailing
+# out once less than this remains — i.e. once ~35s have already elapsed —
+# is the "internal target around 35 seconds" before starting the S3
+# GetObject stream, the slowest step in the handler.
+DOCUMENT_STREAM_MIN_REMAINING_MS = 10_000
 
 
 class LambdaContext(Protocol):
@@ -21,9 +26,9 @@ def remaining_ms(context: LambdaContext) -> int:
     return context.get_remaining_time_in_millis()
 
 
-def is_near_soft_deadline(context: LambdaContext) -> bool:
-    """True once less than the soft deadline remains in this invocation."""
-    return remaining_ms(context) <= SOFT_DEADLINE_MS
+def is_near_soft_deadline(context: LambdaContext, threshold_ms: int = SOFT_DEADLINE_MS) -> bool:
+    """True once less than `threshold_ms` remains in this invocation."""
+    return remaining_ms(context) <= threshold_ms
 
 
 def outbound_call_timeout_seconds(context: LambdaContext) -> float:
