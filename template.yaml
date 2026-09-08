@@ -1,9 +1,15 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  GWEB merchant onboarding — Phase 1 (IaC foundation, core application CRUD).
-  See GWEB_Implementation_Spec.md. Document upload, MCC/classify, AI
-  evaluation, and submit are later phases and are intentionally absent here.
+  GWEB merchant onboarding — Phase 1 (core application CRUD) + Phase 2
+  (document upload: presign/complete). See GWEB_Implementation_Spec.md.
+  MCC/classify, AI evaluation, and submit are later phases, still absent.
+
+Parameters:
+  MaxDocumentSizeBytes:
+    Type: Number
+    Default: 15728640 # 15 MB — configurable per approved Phase 2 decisions
+    Description: Maximum accepted document size in bytes, enforced at presign (declared) and complete (actual) time.
 
 Globals:
   Function:
@@ -158,6 +164,69 @@ Resources:
                 - dynamodb:PutItem
                 - dynamodb:UpdateItem
               Resource: !GetAtt OnboardingTable.Arn
+
+  PresignDocumentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: gweb-presign-document
+      CodeUri: src/
+      Handler: handlers.presign_document.handler
+      Environment:
+        Variables:
+          DOCUMENTS_BUCKET_NAME: !Ref DocumentsBucket
+          MAX_DOCUMENT_SIZE_BYTES: !Ref MaxDocumentSizeBytes
+      Events:
+        PresignDocument:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref OnboardingHttpApi
+            Path: /applications/{id}/documents/presign
+            Method: post
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+              Resource: !GetAtt OnboardingTable.Arn
+            - Effect: Allow
+              # Required so the presigned PUT URL this function mints is
+              # actually usable — S3 authorizes the *signing* principal's
+              # permissions when the client later performs the upload.
+              Action:
+                - s3:PutObject
+              Resource: !Sub "${DocumentsBucket.Arn}/applications/*/documents/*"
+
+  CompleteDocumentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: gweb-complete-document
+      CodeUri: src/
+      Handler: handlers.complete_document.handler
+      Environment:
+        Variables:
+          DOCUMENTS_BUCKET_NAME: !Ref DocumentsBucket
+          MAX_DOCUMENT_SIZE_BYTES: !Ref MaxDocumentSizeBytes
+      Events:
+        CompleteDocument:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref OnboardingHttpApi
+            Path: /applications/{id}/documents/{documentId}/complete
+            Method: post
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt OnboardingTable.Arn
+            - Effect: Allow
+              # Covers both HeadObject and GetObject — S3 has no separate
+              # HeadObject IAM action.
+              Action:
+                - s3:GetObject
+              Resource: !Sub "${DocumentsBucket.Arn}/applications/*/documents/*"
 
 Outputs:
   ApiUrl:
