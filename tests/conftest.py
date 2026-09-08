@@ -47,6 +47,22 @@ def dynamodb_table(aws_credentials, monkeypatch):
         dynamo_client._raw_client.cache_clear()
 
 
+BUCKET_NAME = "gweb-onboarding-documents-test"
+
+
+@pytest.fixture
+def documents_bucket(dynamodb_table, monkeypatch):
+    """A moto-mocked S3 bucket, in the same mock_aws() context as
+    dynamodb_table — depend on this fixture whenever a test needs both."""
+    monkeypatch.setenv("DOCUMENTS_BUCKET_NAME", BUCKET_NAME)
+    from adapters.storage import s3_client
+
+    s3_client._client.cache_clear()
+    boto3.client("s3", region_name="us-east-1").create_bucket(Bucket=BUCKET_NAME)
+    yield BUCKET_NAME
+    s3_client._client.cache_clear()
+
+
 class FakeLambdaContext:
     """Minimal stand-in for the real Lambda context object."""
 
