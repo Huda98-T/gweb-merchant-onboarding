@@ -1,0 +1,17 @@
+[project]
+name = "gweb-onboarding"
+version = "0.1.0"
+description = "GWEB merchant onboarding backend (AWS SAM, Python 3.12)"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

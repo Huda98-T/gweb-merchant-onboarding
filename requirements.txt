@@ -1,0 +1,4 @@
+# Runtime dependencies for the Lambda layer (see template.yaml DependenciesLayer).
+# boto3 is present in the Lambda runtime by default; pinned here for local/test parity.
+pydantic==2.13.5
+boto3==1.43.90
