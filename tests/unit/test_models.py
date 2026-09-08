@@ -49,6 +49,11 @@ def test_patch_applicant_request_requires_request_id():
         PatchApplicantRequest.model_validate(payload)
 
 
+def test_patch_applicant_request_rejects_empty_request_id():
+    with pytest.raises(ValidationError):
+        PatchApplicantRequest.model_validate(_valid_applicant_payload(requestId=""))
+
+
 def test_patch_business_request_accepts_valid_payload():
     request = PatchBusinessRequest.model_validate(
         {
@@ -62,6 +67,20 @@ def test_patch_business_request_accepts_valid_payload():
     )
     assert request.legal_name == "Ada's Bakery LLC"
     assert request.existing_processor is None
+
+
+def test_patch_business_request_rejects_empty_request_id():
+    with pytest.raises(ValidationError):
+        PatchBusinessRequest.model_validate(
+            {
+                "requestId": "",
+                "legalName": "Ada's Bakery LLC",
+                "entityType": "LLC",
+                "registrationId": "EIN-123",
+                "addresses": {"business": {"line1": "1 Main St"}},
+                "volumeMetrics": {"monthlyVolume": 10000},
+            }
+        )
 
 
 def test_application_meta_item_defaults():

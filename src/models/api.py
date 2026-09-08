@@ -25,7 +25,7 @@ class CreateApplicationResponse(BaseModel):
 class PatchApplicantRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    request_id: str = Field(alias="requestId")
+    request_id: str = Field(alias="requestId", min_length=1)
     person_id: str | None = Field(default=None, alias="personId")
     first_name: str = Field(alias="firstName", min_length=1)
     last_name: str = Field(alias="lastName", min_length=1)
@@ -48,7 +48,7 @@ class PatchApplicantResponse(BaseModel):
 class PatchBusinessRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    request_id: str = Field(alias="requestId")
+    request_id: str = Field(alias="requestId", min_length=1)
     legal_name: str = Field(alias="legalName", min_length=1)
     dba: str | None = None
     entity_type: str = Field(alias="entityType", min_length=1)
