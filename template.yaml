@@ -291,6 +291,51 @@ Resources:
                 - dynamodb:PutItem
               Resource: !GetAtt OnboardingTable.Arn
 
+  EvaluateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: gweb-evaluate
+      CodeUri: src/
+      Handler: handlers.evaluate.handler
+      Events:
+        Evaluate:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref OnboardingHttpApi
+            Path: /applications/{id}/evaluate
+            Method: post
+      Policies:
+        - Statement:
+            - Effect: Allow
+              # Query (not GetItem): reads META + BUSINESS + MCC#CONFIRMED +
+              # DOC#<statementDocId> + EVAL#LATEST in one call, same pattern
+              # as GetApplicationFunction. No external resource — the mock
+              # AI adapter is in-process, not a network call.
+              Action:
+                - dynamodb:Query
+                - dynamodb:PutItem
+              Resource: !GetAtt OnboardingTable.Arn
+
+  GetEvaluationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: gweb-get-evaluation
+      CodeUri: src/
+      Handler: handlers.get_evaluation.handler
+      Events:
+        GetEvaluation:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref OnboardingHttpApi
+            Path: /applications/{id}/evaluation
+            Method: get
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+              Resource: !GetAtt OnboardingTable.Arn
+
 Outputs:
   ApiUrl:
     Description: Base URL for the v1 API
