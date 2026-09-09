@@ -38,7 +38,7 @@ from models.evaluation import (
     EvaluationStatus,
     GetEvaluationResponse,
 )
-from services import rate_calculation_service, risk_flag_service
+from services import mcc_catalog_service, rate_calculation_service, risk_flag_service
 
 logger = get_logger(__name__)
 
@@ -131,9 +131,12 @@ def evaluate_application(
         statement_doc=statement_doc,
     )
 
+    mcc_code = mcc_confirmed.get("code") if mcc_confirmed else None
+    mcc_catalog_entry = mcc_catalog_service.get_entry(mcc_code) if mcc_code else None
+
     ai_context = AiCommentaryContext(
-        mcc_code=mcc_confirmed.get("code") if mcc_confirmed else None,
-        mcc_description=None,
+        mcc_code=mcc_code,
+        mcc_description=mcc_catalog_entry.get("description") if mcc_catalog_entry else None,
         risk_tier=mcc_confirmed.get("riskTier") if mcc_confirmed else None,
         effective_rate=effective_rate,
         monthly_volume=statement_metrics.monthly_volume,

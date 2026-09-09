@@ -105,6 +105,40 @@ def test_evaluate_happy_path_returns_complete_with_separated_numbers_and_comment
     assert "3.00%" in body["aiCommentary"]["summary"]
 
 
+def test_evaluate_ai_commentary_cites_real_mcc_description_not_none(dynamodb_table):
+    """Regression test: AiCommentaryContext.mcc_description was previously
+    hardcoded to None in evaluation_service.py, so the AI summary silently
+    read "MCC 5812 (None)" instead of citing the real catalog description.
+    Checking only that `summary` is truthy (as the happy-path test above
+    does) can't catch this — it asserts the actual description text."""
+    app_id = _create_application()
+    _set_business_volume_metrics(
+        app_id,
+        monthlyVolume=50000,
+        currentProcessingRate=0.029,
+        transactionCount=500,
+        perTransactionFee=0.10,
+    )
+    classify_mcc.handler(
+        _event(
+            path_id=app_id,
+            token=app_id,
+            body={"requestId": "c1", "selfSelectedActivity": "Restaurant"},
+        ),
+        CONTEXT,
+    )
+    confirm_mcc.handler(
+        _event(path_id=app_id, token=app_id, body={"requestId": "cf1", "code": "5812"}), CONTEXT
+    )
+
+    body = _body(
+        evaluate.handler(_event(path_id=app_id, token=app_id, body={"requestId": "r1"}), CONTEXT)
+    )
+    summary = body["aiCommentary"]["summary"]
+    assert "MCC 5812 (Eating places and Restaurants)" in summary
+    assert "None" not in summary
+
+
 def test_evaluate_requires_matching_token(dynamodb_table):
     app_id = _create_application()
     response = evaluate.handler(
