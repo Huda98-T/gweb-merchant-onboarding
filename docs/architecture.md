@@ -92,16 +92,26 @@ call and are the only places this matters:
    runs under a hard `ThreadPoolExecutor` deadline
    (`outbound_call_timeout_seconds`) — `future.result(timeout=...)`
    stops *waiting* for a hung call (Python can't forcibly kill a thread;
-   the frozen/recycled Lambda environment handles actual cleanup). Both
-   the preflight-too-low-budget path (`202 PROCESSING`, no call attempted)
-   and the mid-call-timeout path (`504`, `EVAL#LATEST` persists `FAILED`)
-   are covered by dedicated tests, including a real ~6-second wall-clock
-   test against a fake provider that sleeps 10 seconds.
+   the frozen/recycled Lambda environment handles actual cleanup).
 
 Every other handler only talks to DynamoDB, which has its own AWS-managed
 timeout/retry behavior well inside the 45s budget for the query shapes
 this system uses (single-partition `Query`/`GetItem`/`PutItem`, never a
 scan).
+
+### The proof — which tests, what they simulate, what's asserted
+
+| Test | Simulates | Internal budget enforced | Assertion |
+|---|---|---|---|
+| `tests/integration/test_evaluation_flow.py::test_evaluate_hanging_ai_call_times_out_within_budget_and_persists_failed` | A fake `AiProvider` that `time.sleep(10)`s — a genuinely hung/slow AI dependency, not a mock of the timeout mechanism itself | `EVALUATION_AI_CALL_MIN_REMAINING_MS` (10s preflight) + `outbound_call_timeout_seconds` (computed ~6s for this test's fake remaining-time context) | Real wall-clock elapsed time stays under 9s (i.e. the 6s deadline fires, not the provider's 10s sleep); `EVAL#LATEST` persists `status=FAILED`; the call raises `UpstreamTimeoutError` → `504` |
+| `tests/integration/test_evaluation_flow.py::test_evaluate_low_budget_returns_processing_without_calling_ai` | Remaining Lambda time already below the preflight threshold when `/evaluate` is called | `EVALUATION_AI_CALL_MIN_REMAINING_MS` | The AI provider is asserted **never called** at all (a monkeypatched provider raises `AssertionError` if invoked); response is `202 PROCESSING` |
+| `tests/unit/test_s3_client.py::test_head_object_maps_slow_s3_dependency_to_upstream_timeout_error` | A fake S3 client whose `head_object` raises `ReadTimeoutError` | — (adapter-level: the static `connect_timeout`/`read_timeout` on the S3 client) | `UpstreamTimeoutError` is raised, not a hang |
+| `tests/unit/test_s3_client.py::test_verify_object_stream_maps_connect_timeout_to_upstream_timeout_error` | A fake S3 client whose `get_object` raises `ConnectTimeoutError` | — (same) | `UpstreamTimeoutError` is raised, not a hang |
+
+The hanging-AI test is the one that actually proves the end-to-end
+budget claim (real thread, real sleep, real elapsed-time assertion,
+not a mocked-away timer) — it's also the slowest test in the suite by
+design, at ~6 seconds of genuine wall-clock wait.
 
 ## Replaceable adapters (spec §11)
 

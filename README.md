@@ -8,9 +8,10 @@ whole flow end-to-end against a local, real-code harness (no AWS account
 required to try it).
 
 See also: [SECURITY.md](SECURITY.md) (IAM, data handling, known gaps),
-[AI-USAGE.md](AI-USAGE.md) (how this codebase was built), and
+[AI-USAGE.md](AI-USAGE.md) (how this codebase was built),
 [docs/architecture.md](docs/architecture.md) (data model, request flow,
-the 45-second rule).
+the 45-second rule), and [docs/demo-walkthrough.md](docs/demo-walkthrough.md)
+(one complete application, step by step, with real request/response bodies).
 
 ## Architecture, in one paragraph
 
@@ -84,6 +85,31 @@ ruff check src tests            # lint
 ruff format --check src tests   # formatting
 ```
 
+### Timeout behavior (the 45-second rule)
+
+The two call sites that make an outbound call (`complete_document` → S3,
+`evaluate` → the AI adapter) are preflight-budget-checked
+(`remaining_ms(context)` against a threshold, ~10s) and, for the AI call,
+additionally wrapped in a hard `ThreadPoolExecutor` deadline — see
+[docs/architecture.md § The 45-second rule](docs/architecture.md#the-45-second-rule)
+for the full mechanics. The test that actually *proves* this (not just
+describes it) is:
+
+```
+tests/integration/test_evaluation_flow.py::test_evaluate_hanging_ai_call_times_out_within_budget_and_persists_failed
+```
+
+It simulates a genuinely hung AI dependency (a fake `AiProvider` that
+`time.sleep(10)`s — a real thread, real sleep, not a mocked timer),
+asserts the real wall-clock elapsed time stays under 9 seconds (the
+computed ~6s deadline fires well before the provider's 10s sleep would
+ever return), and confirms `EVAL#LATEST` persists `status=FAILED` with
+the call surfacing as a `504`. A companion test,
+`test_evaluate_low_budget_returns_processing_without_calling_ai`, proves
+the other half — when remaining time is already below budget, the AI
+provider is asserted **never called** at all, and the response is
+`202 PROCESSING`.
+
 ## Building / deploying with SAM
 
 ```bash
@@ -120,12 +146,14 @@ Gateway URL into the "API base URL" field at the top of the page instead —
 the UI's contract usage is identical either way, nothing in the frontend
 assumes which backend it's talking to.
 
-**Demo walkthrough**: New application → fill in one owner/controller and
-the business profile → upload the three required documents (any small
-PDF/JPG/PNG works — the demo's mock verification runs the real signature/
+In the UI: new application → fill in one owner/controller and the
+business profile → upload the three required documents (any small
+PDF/JPG/PNG works — the demo's verification runs the real signature/
 checksum/size checks) → enter a business activity and get MCC suggestions,
 click one to select it, confirm → run the evaluation → refresh the review
-panel to see the full readiness picture → submit.
+panel → submit. For the full step-by-step account with actual request/
+response bodies (not just the UI-click summary above), see
+[docs/demo-walkthrough.md](docs/demo-walkthrough.md).
 
 ## Known limitations / assumptions
 
