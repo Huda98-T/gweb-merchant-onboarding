@@ -65,6 +65,17 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      # Required for the direct browser->S3 presigned PUT (spec §4.1) —
+      # without this, the upload itself (not just the API calls) is
+      # blocked by the browser's CORS preflight. Bucket stays otherwise
+      # fully private (no public access, no bucket policy); this only
+      # permits the signed PUT the client already holds a URL for.
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins: ["*"]
+            AllowedMethods: [PUT]
+            AllowedHeaders: ["*"]
+            MaxAge: 3000
 
   OnboardingHttpApi:
     Type: AWS::Serverless::HttpApi
