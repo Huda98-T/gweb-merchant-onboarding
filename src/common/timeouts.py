@@ -17,6 +17,11 @@ OUTBOUND_CALL_BUDGET_FRACTION = 0.6
 # GetObject stream, the slowest step in the handler.
 DOCUMENT_STREAM_MIN_REMAINING_MS = 10_000
 
+# Phase 4 (/evaluate): same reasoning as DOCUMENT_STREAM_MIN_REMAINING_MS,
+# applied to the AI-adapter call — the first outbound call actually wired
+# through this preflight-check-then-hard-deadline pattern in anger.
+EVALUATION_AI_CALL_MIN_REMAINING_MS = 10_000
+
 
 class LambdaContext(Protocol):
     def get_remaining_time_in_millis(self) -> int: ...
