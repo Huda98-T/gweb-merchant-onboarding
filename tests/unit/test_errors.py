@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from common.errors import ConflictError, NotFoundError, handle_errors
 
@@ -48,6 +48,26 @@ def test_handle_errors_maps_pydantic_validation_error():
     body = json.loads(response["body"])
     assert body["message"] == "Invalid request body"
     assert body["errors"]
+
+
+def test_handle_errors_strips_raw_submitted_value_from_validation_errors():
+    """Pydantic's error dicts normally include `input` — the raw
+    submitted value verbatim. For PII-bearing fields (dob, address,
+    idLast4, ...) that must never reach a log line or the response body."""
+
+    class _PersonLike(BaseModel):
+        id_last4: str = Field(max_length=4)
+
+    @handle_errors
+    def handler(event, context):
+        _PersonLike.model_validate({"id_last4": "not-a-real-ssn-fragment-12345"})
+
+    response = handler({}, None)
+    body = json.loads(response["body"])
+    assert "not-a-real-ssn-fragment-12345" not in response["body"]
+    for error in body["errors"]:
+        assert "input" not in error
+        assert "url" not in error
 
 
 def test_handle_errors_maps_unexpected_exception_to_500_without_leaking_details():

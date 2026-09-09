@@ -58,6 +58,15 @@ class UpstreamTimeoutError(AppError):
     status_code = 504
 
 
+def _sanitize_validation_errors(exc: ValidationError) -> list[dict[str, Any]]:
+    """Pydantic's error dicts include an `input` key — the raw submitted
+    value, verbatim (e.g. a mistyped dob/address/idLast4). That's fine to
+    show a client back their own input in isolation, but this same dict
+    also goes into the log line below, so it's stripped everywhere: no
+    request payload content survives into an error response or a log."""
+    return [{k: v for k, v in err.items() if k not in ("input", "url")} for err in exc.errors()]
+
+
 def handle_errors(handler: Callable[..., dict]) -> Callable[..., dict]:
     """Decorator wrapping a Lambda handler with consistent error responses."""
 
@@ -66,10 +75,11 @@ def handle_errors(handler: Callable[..., dict]) -> Callable[..., dict]:
         try:
             return handler(event, context)
         except ValidationError as exc:
-            logger.warning("request_validation_failed", extra={"errors": exc.errors()})
+            errors = _sanitize_validation_errors(exc)
+            logger.warning("request_validation_failed", extra={"errors": errors})
             return build_response(
                 400,
-                {"message": "Invalid request body", "errors": exc.errors()},
+                {"message": "Invalid request body", "errors": errors},
             )
         except AppError as exc:
             logger.warning(
