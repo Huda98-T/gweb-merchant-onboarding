@@ -6,3 +6,6 @@ pytest==9.1.1
 # real server).
 moto[dynamodb,server]==5.2.3
 ruff==0.16.6
+# scripts/generate_openapi.py writes openapi.yaml directly from the
+# Pydantic models — this is its only non-transitive extra dependency.
+pyyaml==6.0.3
