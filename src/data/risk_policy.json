@@ -1,0 +1,16 @@
+{
+  "default": {
+    "6012": {
+      "tier": "ENHANCED_REVIEW",
+      "reason": "MCC 6012 (Financial Institutions – Merchandise and Services) — financial-institution merchandise/services, including debt repayment, carry elevated compliance and chargeback risk typical of financial-services-adjacent merchants."
+    },
+    "6051": {
+      "tier": "ENHANCED_REVIEW",
+      "reason": "MCC 6051 (Non-Financial Institutions – Foreign Currency, Money Orders and Travelers Cheques) — quasi-cash instruments carry elevated money-laundering and chargeback-fraud risk."
+    },
+    "6211": {
+      "tier": "ENHANCED_REVIEW",
+      "reason": "MCC 6211 (Security Brokers/Dealers) — regulated securities brokerage carries elevated compliance/licensing risk and high-value transactions."
+    }
+  }
+}
