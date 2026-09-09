@@ -25,6 +25,7 @@ from models.api import (
     PatchBusinessResponse,
     PersonView,
 )
+from models.evaluation import GetEvaluationResponse
 from models.items import ApplicationMetaItem, BusinessItem, PersonItem, utc_now_iso
 from models.mcc import MccConfirmedView, MccProposedView, MccView
 
@@ -77,6 +78,7 @@ def get_application(application_id: str) -> GetApplicationResponse:
     business_item = next((i for i in items if i["SK"] == "BUSINESS"), None)
     mcc_proposed_item = next((i for i in items if i["SK"] == "MCC#PROPOSED"), None)
     mcc_confirmed_item = next((i for i in items if i["SK"] == "MCC#CONFIRMED"), None)
+    eval_item = next((i for i in items if i["SK"] == "EVAL#LATEST"), None)
 
     return GetApplicationResponse(
         meta=ApplicationMetaView.model_validate(meta_item),
@@ -90,6 +92,7 @@ def get_application(application_id: str) -> GetApplicationResponse:
             if mcc_confirmed_item
             else None,
         ),
+        evaluation=GetEvaluationResponse.model_validate(eval_item) if eval_item else None,
     )
 
 
