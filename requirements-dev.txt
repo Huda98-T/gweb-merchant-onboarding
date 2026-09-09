@@ -1,4 +1,8 @@
 -r requirements.txt
 pytest==9.1.1
-moto[dynamodb]==5.2.3
+# [server] pulls in flask/flask-cors/werkzeug — only needed for
+# scripts/run_local_demo.py's ThreadedMotoServer (the demo harness), not
+# for the test suite itself (tests use moto's mock_aws decorator, not a
+# real server).
+moto[dynamodb,server]==5.2.3
 ruff==0.16.6
