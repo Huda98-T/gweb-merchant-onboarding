@@ -26,6 +26,7 @@ from models.api import (
     PersonView,
 )
 from models.items import ApplicationMetaItem, BusinessItem, PersonItem, utc_now_iso
+from models.mcc import MccConfirmedView, MccProposedView, MccView
 
 
 def application_pk(application_id: str) -> str:
@@ -74,11 +75,21 @@ def get_application(application_id: str) -> GetApplicationResponse:
 
     person_items = [i for i in items if i["SK"].startswith("PERSON#")]
     business_item = next((i for i in items if i["SK"] == "BUSINESS"), None)
+    mcc_proposed_item = next((i for i in items if i["SK"] == "MCC#PROPOSED"), None)
+    mcc_confirmed_item = next((i for i in items if i["SK"] == "MCC#CONFIRMED"), None)
 
     return GetApplicationResponse(
         meta=ApplicationMetaView.model_validate(meta_item),
         applicant=[PersonView.model_validate(p) for p in person_items],
         business=BusinessView.model_validate(business_item) if business_item else None,
+        mcc=MccView(
+            proposed=MccProposedView.model_validate(mcc_proposed_item)
+            if mcc_proposed_item
+            else None,
+            confirmed=MccConfirmedView.model_validate(mcc_confirmed_item)
+            if mcc_confirmed_item
+            else None,
+        ),
     )
 
 

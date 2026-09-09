@@ -12,6 +12,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from models.items import ApplicationStatus
+from models.mcc import MccView
 
 
 class CreateApplicationResponse(BaseModel):
@@ -105,8 +106,9 @@ class BusinessView(BaseModel):
 
 class GetApplicationResponse(BaseModel):
     """Aggregated read across the whole partition — see spec §3 note on
-    `GET /applications/{id}`. `documents`, `mcc`, and `evaluation` stay
-    empty/null until the corresponding phases exist."""
+    `GET /applications/{id}`. `mcc` is wired to real MCC#PROPOSED/
+    MCC#CONFIRMED data (Phase 3); `documents` and `evaluation` stay
+    empty/null until their corresponding phases exist."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -114,5 +116,5 @@ class GetApplicationResponse(BaseModel):
     applicant: list[PersonView] = Field(default_factory=list)
     business: BusinessView | None = None
     documents: list[dict[str, Any]] = Field(default_factory=list)
-    mcc: dict[str, Any] | None = None
+    mcc: MccView = Field(default_factory=MccView)
     evaluation: dict[str, Any] | None = None

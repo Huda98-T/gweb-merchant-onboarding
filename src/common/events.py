@@ -17,6 +17,14 @@ def get_path_param(event: dict, name: str) -> str:
     return value
 
 
+def get_query_param(event: dict, name: str) -> str:
+    params = event.get("queryStringParameters") or {}
+    value = params.get(name)
+    if not value:
+        raise RequestValidationError(f"Missing query parameter: {name}")
+    return value
+
+
 def parse_json_body(event: dict) -> dict[str, Any]:
     raw = event.get("body") or "{}"
     if event.get("isBase64Encoded"):

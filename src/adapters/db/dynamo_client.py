@@ -66,6 +66,13 @@ def query_by_pk(pk: str) -> list[dict[str, Any]]:
         kwargs["ExclusiveStartKey"] = last_key
 
 
+def put_item(item: dict[str, Any]) -> None:
+    """Unconditional PutItem — full overwrite. Used for single-slot,
+    upsert-style items (e.g. MCC#PROPOSED/MCC#CONFIRMED) that have no
+    optimistic-concurrency version and are safe to freely replace."""
+    _table().put_item(Item=item)
+
+
 def put_item_if_absent(item: dict[str, Any]) -> None:
     """PutItem guarded against overwriting an existing item with the same key."""
     try:
