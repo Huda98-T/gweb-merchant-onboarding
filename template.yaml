@@ -336,6 +336,51 @@ Resources:
                 - dynamodb:GetItem
               Resource: !GetAtt OnboardingTable.Arn
 
+  GetReviewFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: gweb-get-review
+      CodeUri: src/
+      # Justified extension (spec §3 has no GET /review) — read-only
+      # readiness view, same computation submit's validation gate uses.
+      Handler: handlers.get_review.handler
+      Events:
+        GetReview:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref OnboardingHttpApi
+            Path: /applications/{id}/review
+            Method: get
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource: !GetAtt OnboardingTable.Arn
+
+  SubmitFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: gweb-submit
+      CodeUri: src/
+      Handler: handlers.submit.handler
+      Events:
+        Submit:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref OnboardingHttpApi
+            Path: /applications/{id}/submit
+            Method: post
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt OnboardingTable.Arn
+
 Outputs:
   ApiUrl:
     Description: Base URL for the v1 API
