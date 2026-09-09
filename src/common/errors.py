@@ -72,11 +72,15 @@ def handle_errors(handler: Callable[..., dict]) -> Callable[..., dict]:
 
     @functools.wraps(handler)
     def wrapper(event: dict, context: Any) -> dict:
+        application_id = (event.get("pathParameters") or {}).get("id")
         try:
             return handler(event, context)
         except ValidationError as exc:
             errors = _sanitize_validation_errors(exc)
-            logger.warning("request_validation_failed", extra={"errors": errors})
+            logger.warning(
+                "request_validation_failed",
+                extra={"applicationId": application_id, "errors": errors},
+            )
             return build_response(
                 400,
                 {"message": "Invalid request body", "errors": errors},
@@ -84,14 +88,18 @@ def handle_errors(handler: Callable[..., dict]) -> Callable[..., dict]:
         except AppError as exc:
             logger.warning(
                 "app_error",
-                extra={"status_code": exc.status_code, "message": exc.message},
+                extra={
+                    "applicationId": application_id,
+                    "status_code": exc.status_code,
+                    "message": exc.message,
+                },
             )
             body = {"message": exc.message}
             if exc.details:
                 body.update(exc.details)
             return build_response(exc.status_code, body)
         except Exception:
-            logger.exception("unhandled_error")
+            logger.exception("unhandled_error", extra={"applicationId": application_id})
             return build_response(500, {"message": "Internal server error"})
 
     return wrapper

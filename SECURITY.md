@@ -129,3 +129,9 @@ and grants no access to anything real.
   implemented and tested, but `confirm_mcc` always passes `"default"` —
   Phase 3 decision, since Phase 1's `existingProcessor` field has no
   defined shape to reliably derive a provider key from).
+- No document retention/deletion policy. Uploaded documents (and their
+  S3 objects) persist indefinitely — no lifecycle rule, no manual delete
+  endpoint, no retention-period concept anywhere in this system. A real
+  deployment would need an explicit retention policy (regulatory
+  requirement in most jurisdictions for KYC/onboarding documents) plus
+  either an S3 Lifecycle rule or an authenticated delete path.

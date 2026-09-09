@@ -124,6 +124,18 @@ fixed by `template.yaml`). No other environment configuration is needed —
 `TABLE_NAME` and `DOCUMENTS_BUCKET_NAME` are wired automatically from the
 stack's own DynamoDB table / S3 bucket resources.
 
+### Tearing down
+
+```bash
+sam delete --stack-name <your-stack-name>
+```
+
+`template.yaml` sets no `DeletionPolicy` on `DocumentsBucket`, so it
+defaults to `Delete` — but CloudFormation will fail to delete a
+**non-empty** S3 bucket. If any documents were uploaded, empty the bucket
+first (`aws s3 rm s3://<bucket-name> --recursive`) or `sam delete` will
+error out mid-teardown.
+
 ## Running the demo
 
 There is no live AWS deployment behind this repository by default. The
