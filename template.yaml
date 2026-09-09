@@ -1,9 +1,10 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  GWEB merchant onboarding — Phase 1 (core application CRUD) + Phase 2
-  (document upload: presign/complete). See GWEB_Implementation_Spec.md.
-  MCC/classify, AI evaluation, and submit are later phases, still absent.
+  GWEB merchant onboarding — Phase 1 (core application CRUD), Phase 2
+  (document upload: presign/complete), and Phase 3 (MCC search/classify/
+  confirm). See GWEB_Implementation_Spec.md. AI evaluation and submit are
+  later phases, still absent.
 
 Parameters:
   MaxDocumentSizeBytes:
@@ -227,6 +228,68 @@ Resources:
               Action:
                 - s3:GetObject
               Resource: !Sub "${DocumentsBucket.Arn}/applications/*/documents/*"
+
+  SearchMccFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: gweb-search-mcc
+      CodeUri: src/
+      Handler: handlers.search_mcc.handler
+      Events:
+        SearchMcc:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref OnboardingHttpApi
+            Path: /mcc
+            Method: get
+      # No Policies — the catalog is a packaged file (src/data/), never
+      # DynamoDB or any other AWS resource. Not application-scoped, so no
+      # auth either (spec §3: this route has no {id} path parameter).
+
+  ClassifyMccFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: gweb-classify-mcc
+      CodeUri: src/
+      Handler: handlers.classify_mcc.handler
+      Events:
+        ClassifyMcc:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref OnboardingHttpApi
+            Path: /applications/{id}/classify
+            Method: post
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+              Resource: !GetAtt OnboardingTable.Arn
+
+  ConfirmMccFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: gweb-confirm-mcc
+      CodeUri: src/
+      # Decision #1: a separate confirmation endpoint (not in the original
+      # spec §3 table) — justified because the assessment requires
+      # applicant confirmation/correction of the system's MCC proposal.
+      Handler: handlers.confirm_mcc.handler
+      Events:
+        ConfirmMcc:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref OnboardingHttpApi
+            Path: /applications/{id}/mcc/confirm
+            Method: post
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+              Resource: !GetAtt OnboardingTable.Arn
 
 Outputs:
   ApiUrl:
